@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ABR: Agent Blast Radius</title>
+<meta name="description" content="See what a hijacked AI agent could do in your AWS account. Runs in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #E9EEF2;
+  --sheet: #F7F9FA;
+  --ink: #17202E;
+  --muted: #586579;
+  --line: #C3CDD7;
+  --safe: #1E6F6B;
+  --critical: #B3261E;
+  --high: #C75A12;
+  --medium: #8C6D00;
+  --low: #5B6B7F;
+  --focus: #2457C5;
+  --sans: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { background: var(--paper); color: var(--ink); }
+body { margin: 0; font-family: var(--sans); font-size: 17px; line-height: 1.5; font-variation-settings: "wdth" 100; }
+a { color: var(--ink); text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+
+/* Header */
+.top { display: flex; justify-content: space-between; align-items: center; padding: 22px 0; }
+.mark { font-weight: 800; font-size: 22px; letter-spacing: 0.02em; font-variation-settings: "wdth" 125; text-decoration: none; }
+.top nav a { margin-left: 22px; font-size: 15px; }
+
+/* Intro */
+.intro { padding: 36px 0 34px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr); gap: 48px; align-items: end; }
+h1 { margin: 0; font-size: clamp(38px, 5.6vw, 72px); line-height: 0.98; font-weight: 800; letter-spacing: -0.01em; font-variation-settings: "wdth" 72; max-width: 12ch; }
+.intro p { margin: 0; color: var(--muted); max-width: 46ch; }
+
+/* Workbench */
+.bench { background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; }
+.editors { display: grid; grid-template-columns: 1fr 1fr; }
+.editor { padding: 18px 20px 14px; min-width: 0; }
+.editor + .editor { border-left: 1px solid var(--line); }
+.editor label { display: block; font-weight: 700; font-size: 16px; }
+.editor .hint { display: block; color: var(--muted); font-size: 14px; margin-bottom: 10px; }
+textarea {
+  width: 100%; height: 300px; resize: vertical; padding: 12px 14px;
+  font: 13px/1.55 var(--mono); color: var(--ink); background: #fff;
+  border: 1px solid var(--line); border-radius: 4px; tab-size: 2;
+}
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
+.bar .spacer { flex: 1; }
+button {
+  font: 600 15px var(--sans); padding: 10px 16px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--ink); background: transparent; color: var(--ink);
+}
+button:hover { background: #fff; }
+button.primary { background: var(--ink); color: #fff; padding: 10px 26px; }
+button.primary:hover { background: #2C3A50; }
+.error { color: var(--critical); font-size: 15px; padding: 0 20px 14px; margin: 0; }
+.error:empty { display: none; }
+
+/* Results */
+.results { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 0; margin-top: 28px; border-top: 2px solid var(--ink); }
+.mapcol { padding: 26px 32px 30px 0; border-right: 1px solid var(--line); }
+.findcol { padding: 26px 0 30px 32px; min-width: 0; }
+h2 { font-size: 24px; line-height: 1.2; margin: 0 0 6px; font-weight: 800; font-variation-settings: "wdth" 90; }
+.sub { color: var(--muted); font-size: 15px; margin: 0 0 16px; }
+
+#map { width: 100%; height: auto; display: block; }
+#map .ring { fill: none; stroke: var(--line); }
+#map .ring.outer { stroke-dasharray: 3 5; }
+#map .spoke { stroke: var(--line); }
+#map .cat { font: 600 16px var(--sans); fill: var(--muted); }
+#map .core { fill: var(--ink); }
+#map .corelabel { font: 700 15px var(--sans); fill: #fff; }
+#map .dot { stroke: var(--sheet); stroke-width: 1.5; }
+#map .dot.used { fill: var(--safe); }
+#map .dot.unused { fill: var(--critical); }
+#map .dot:hover, #map .dot:focus { stroke: var(--ink); stroke-width: 2.5; outline: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 14px; color: var(--muted); margin-top: 8px; }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; }
+.legend .l-used::before { background: var(--safe); }
+.legend .l-unused::before { background: var(--critical); }
+.tip { min-height: 24px; font: 13px var(--mono); margin-top: 6px; }
+
+.trifecta { margin-top: 22px; }
+.trifecta h3 { font-size: 16px; margin: 0 0 8px; }
+.legs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.leg { border: 1px solid var(--line); border-radius: 4px; padding: 9px 11px; font-size: 14px; background: #fff; }
+.leg b { display: block; font-size: 14px; }
+.leg.on { border-color: var(--critical); box-shadow: inset 4px 0 0 var(--critical); }
+.leg .state { color: var(--muted); }
+.leg.on .state { color: var(--critical); font-weight: 600; }
+
+.score { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.score .num { font-size: 44px; font-weight: 800; line-height: 1; font-variation-settings: "wdth" 72; }
+.score .rating { font-weight: 700; }
+.meter { height: 8px; background: #DCE3EA; border-radius: 4px; margin: 10px 0 6px; overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0; background: var(--ink); transition: width 0.6s ease; }
+.counts { font-size: 15px; color: var(--muted); margin: 0 0 18px; }
+
+.findings { list-style: none; margin: 0; padding: 0; }
+.findings li { border-top: 1px solid var(--line); }
+.findings li:last-child { border-bottom: 1px solid var(--line); }
+details summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 82px 1fr; gap: 12px; padding: 11px 0; align-items: baseline; }
+details summary::-webkit-details-marker { display: none; }
+.sev { font: 700 13px var(--sans); }
+.sev.CRITICAL { color: var(--critical); }
+.sev.HIGH { color: var(--high); }
+.sev.MEDIUM { color: var(--medium); }
+.sev.LOW { color: var(--low); }
+.ftitle { font-weight: 600; font-size: 15.5px; line-height: 1.35; }
+.ftitle small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
+.fbody { padding: 0 0 14px 94px; font-size: 15px; }
+.fbody p { margin: 0 0 8px; white-space: pre-line; }
+.fbody code { font: 12.5px var(--mono); background: #fff; border: 1px solid var(--line); padding: 1px 5px; border-radius: 3px; display: inline-block; margin: 2px 2px 2px 0; }
+.clean { padding: 16px 0; color: var(--safe); font-weight: 600; }
+
+/* Policy */
+.policy { margin-top: 8px; padding: 28px 0 8px; border-top: 2px solid var(--ink); }
+.policy-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.policy-head p { margin: 0; color: var(--muted); max-width: 62ch; font-size: 15px; }
+.policy-head .actions { display: flex; gap: 10px; }
+pre { margin: 0; background: var(--ink); color: #E4EAF0; padding: 18px 20px; border-radius: 6px; overflow: auto; font: 13px/1.6 var(--mono); max-height: 380px; }
+
+/* About */
+.about { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; padding: 44px 0 30px; border-top: 1px solid var(--line); margin-top: 36px; }
+.about h3 { margin: 0 0 6px; font-size: 18px; }
+.about p { margin: 0; color: var(--muted); font-size: 15.5px; }
+footer { padding: 22px 0 40px; font-size: 14px; color: var(--muted); }
+
+@media (max-width: 860px) {
+  .intro { grid-template-columns: 1fr; gap: 16px; padding-top: 20px; }
+  .editors { grid-template-columns: 1fr; }
+  .editor + .editor { border-left: 0; border-top: 1px solid var(--line); }
+  textarea { height: 220px; }
+  .results { grid-template-columns: 1fr; }
+  .mapcol { padding: 24px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .findcol { padding: 24px 0; }
+  .about { grid-template-columns: 1fr; gap: 22px; }
+  .fbody { padding-left: 0; }
+  details summary { grid-template-columns: 72px 1fr; }
+}
+@media (max-width: 520px) {
+  .wrap { padding: 0 16px; }
+  .legs { grid-template-columns: 1fr; }
+  .top nav a:first-child { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter i { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="mark" href="#">ABR</a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="https://github.com/CasimirTerr/ABR">Code on GitHub</a>
+    </nav>
+  </header>
+
+  <section class="intro">
+    <h1>If someone hijacks your AI agent, how far can it reach?</h1>
+    <p>Paste the agent's tools and the IAM policy on its role. ABR finds every risky AWS action a prompt injection could steer it toward, then writes a tighter policy. It runs in your browser, so nothing you paste leaves this page.</p>
+  </section>
+
+  <section class="bench" aria-label="Scanner">
+    <div class="editors">
+      <div class="editor">
+        <label for="manifest">Agent tools</label>
+        <span class="hint">Each tool, the AWS actions it calls, and whether it reads untrusted input</span>
+        <textarea id="manifest" spellcheck="false"></textarea>
+      </div>
+      <div class="editor">
+        <label for="policy">IAM policy on the agent's role</label>
+        <span class="hint">Paste one policy document, or a JSON list of several</span>
+        <textarea id="policy" spellcheck="false"></textarea>
+      </div>
+    </div>
+    <p class="error" id="error" role="alert"></p>
+    <div class="bar">
+      <button type="button" id="loadBad">Load the example support bot</button>
+      <button type="button" id="loadFixed">Use its fixed policy</button>
+      <span class="spacer"></span>
+      <button type="button" class="primary" id="scan">Scan</button>
+    </div>
+  </section>
+
+  <section class="results" aria-live="polite">
+    <div class="mapcol">
+      <h2>Blast map</h2>
+      <p class="sub" id="mapsub"></p>
+      <svg id="map" viewBox="-100 -6 640 452" role="img" aria-labelledby="mapdesc">
+        <desc id="mapdesc">Risky AWS actions the agent can reach, grouped by type. Inner ring: used by a tool. Outer ring: allowed but unused.</desc>
+      </svg>
+      <div class="legend"><span class="l-used">Used by a tool</span><span class="l-unused">Allowed but never used</span></div>
+      <div class="tip" id="tip" aria-live="polite"></div>
+      <div class="trifecta">
+        <h3>Lethal trifecta check</h3>
+        <div class="legs" id="legs"></div>
+      </div>
+    </div>
+    <div class="findcol">
+      <h2>Findings</h2>
+      <div class="score"><span class="num" id="score">0</span><span>out of 100 blast radius</span><span class="rating" id="rating"></span></div>
+      <div class="meter"><i id="meter"></i></div>
+      <p class="counts" id="counts"></p>
+      <ul class="findings" id="findings"></ul>
+    </div>
+  </section>
+
+  <section class="policy">
+    <div class="policy-head">
+      <div>
+        <h2>Least-privilege policy</h2>
+        <p>Only the actions and resources the tools actually use. Swap it in and scan again to watch the outer ring empty out.</p>
+      </div>
+      <div class="actions">
+        <button type="button" id="copy">Copy policy</button>
+        <button type="button" id="apply">Scan with this policy</button>
+      </div>
+    </div>
+    <pre id="lp"></pre>
+  </section>
+
+  <section class="about" id="how">
+    <div>
+      <h3>Why this matters</h3>
+      <p>AI agents get real AWS credentials to look up orders or read files. A hidden instruction in a web page or email can turn those credentials against you. The agent's IAM role decides how much damage that does.</p>
+    </div>
+    <div>
+      <h3>What ABR checks</h3>
+      <p>77 risky actions across data access, exfiltration, privilege escalation, deletion and turning off logging. It also checks 14 known IAM escalation paths, wildcard permissions, and the lethal trifecta: untrusted input, private data and a way out in one agent.</p>
+    </div>
+    <div>
+      <h3>Limits</h3>
+      <p>ABR reads identity policies only. Permission boundaries and SCPs can only remove access, but resource policies like S3 bucket policies can add it, and ABR doesn't see those. The same engine runs as a command line tool for CI.</p>
+    </div>
+  </section>
+
+  <footer>Built by Casimir Terrence. <a href="https://github.com/CasimirTerr/ABR">Source, tests and CLI on GitHub</a>.</footer>
+</div>
+
+<script>
+/* ===== Analyzer: a direct port of abr/ (Python). Keep the two in sync. ===== */
+const CATALOG = /*CATALOG_START*/{"risky_actions":{"s3:GetObject":["data_access"],"s3:ListBucket":["data_access"],"secretsmanager:GetSecretValue":["data_access"],"ssm:GetParameter":["data_access"],"ssm:GetParameters":["data_access"],"ssm:GetParametersByPath":["data_access"],"kms:Decrypt":["data_access"],"dynamodb:GetItem":["data_access"],"dynamodb:Query":["data_access"],"dynamodb:Scan":["data_access"],"rds-data:ExecuteStatement":["data_access"],"logs:GetLogEvents":["data_access"],"logs:FilterLogEvents":["data_access"],"lambda:GetFunction":["data_access"],"codecommit:GetFile":["data_access"],"s3:PutBucketPolicy":["exfiltration"],"s3:PutBucketAcl":["exfiltration"],"s3:PutObjectAcl":["exfiltration"],"s3:DeletePublicAccessBlock":["exfiltration","defense_evasion"],"s3:PutObject":["exfiltration"],"ses:SendEmail":["exfiltration"],"ses:SendRawEmail":["exfiltration"],"sns:Publish":["exfiltration"],"sqs:SendMessage":["exfiltration"],"lambda:CreateFunctionUrlConfig":["exfiltration"],"lambda:AddPermission":["exfiltration"],"ec2:ModifySnapshotAttribute":["exfiltration"],"ec2:ModifyImageAttribute":["exfiltration"],"rds:ModifyDBSnapshotAttribute":["exfiltration"],"ec2:AuthorizeSecurityGroupIngress":["exfiltration"],"iam:CreatePolicyVersion":["privilege_escalation"],"iam:SetDefaultPolicyVersion":["privilege_escalation"],"iam:AttachUserPolicy":["privilege_escalation"],"iam:AttachRolePolicy":["privilege_escalation"],"iam:AttachGroupPolicy":["privilege_escalation"],"iam:PutUserPolicy":["privilege_escalation"],"iam:PutRolePolicy":["privilege_escalation"],"iam:PutGroupPolicy":["privilege_escalation"],"iam:AddUserToGroup":["privilege_escalation"],"iam:CreateAccessKey":["privilege_escalation","exfiltration"],"iam:CreateLoginProfile":["privilege_escalation"],"iam:UpdateLoginProfile":["privilege_escalation"],"iam:UpdateAssumeRolePolicy":["privilege_escalation"],"iam:CreateUser":["privilege_escalation"],"iam:PassRole":["privilege_escalation"],"sts:AssumeRole":["privilege_escalation"],"lambda:UpdateFunctionCode":["privilege_escalation"],"lambda:CreateFunction":["privilege_escalation"],"lambda:InvokeFunction":["privilege_escalation"],"ec2:RunInstances":["privilege_escalation"],"cloudformation:CreateStack":["privilege_escalation"],"glue:CreateDevEndpoint":["privilege_escalation"],"ssm:SendCommand":["privilege_escalation"],"s3:DeleteObject":["destructive"],"s3:DeleteBucket":["destructive"],"dynamodb:DeleteTable":["destructive"],"dynamodb:DeleteItem":["destructive"],"ec2:TerminateInstances":["destructive"],"ec2:DeleteVolume":["destructive"],"ec2:DeleteSnapshot":["destructive"],"rds:DeleteDBInstance":["destructive"],"rds:DeleteDBCluster":["destructive"],"kms:ScheduleKeyDeletion":["destructive"],"kms:DisableKey":["destructive"],"lambda:DeleteFunction":["destructive"],"iam:DeleteRole":["destructive"],"backup:DeleteRecoveryPoint":["destructive"],"cloudtrail:StopLogging":["defense_evasion"],"cloudtrail:DeleteTrail":["defense_evasion"],"cloudtrail:UpdateTrail":["defense_evasion"],"cloudtrail:PutEventSelectors":["defense_evasion"],"guardduty:DeleteDetector":["defense_evasion"],"guardduty:UpdateDetector":["defense_evasion"],"securityhub:DisableSecurityHub":["defense_evasion"],"config:StopConfigurationRecorder":["defense_evasion"],"config:DeleteConfigurationRecorder":["defense_evasion"],"logs:DeleteLogGroup":["defense_evasion","destructive"]},"escalation_paths":[["Rewrite own policy",["iam:CreatePolicyVersion"],"Can publish a new version of a managed policy with full admin rights."],["Switch policy version",["iam:SetDefaultPolicyVersion"],"Can roll a policy back to an older, more permissive version."],["Attach admin policy",["iam:AttachRolePolicy"],"Can attach AdministratorAccess to a role, including its own."],["Attach admin policy to a user",["iam:AttachUserPolicy"],"Can attach AdministratorAccess to a user."],["Write inline admin policy",["iam:PutRolePolicy"],"Can add an inline policy granting any permission to a role."],["Mint access keys",["iam:CreateAccessKey"],"Can create long-lived access keys for another user and hand them out."],["Set a console password",["iam:CreateLoginProfile"],"Can give another user a console password and log in as them."],["Lambda with a privileged role",["iam:PassRole","lambda:CreateFunction","lambda:InvokeFunction"],"Can create a Lambda that runs as a more powerful role, then invoke it."],["Backdoor existing Lambda",["lambda:UpdateFunctionCode"],"Can replace the code of a Lambda that already runs with a powerful role."],["EC2 with a privileged role",["iam:PassRole","ec2:RunInstances"],"Can launch an instance with a powerful instance profile and use its credentials."],["CloudFormation with a privileged role",["iam:PassRole","cloudformation:CreateStack"],"Can deploy a stack that runs as a more powerful role."],["Glue dev endpoint",["iam:PassRole","glue:CreateDevEndpoint"],"Can create a Glue endpoint with a powerful role and SSH into it."],["Run commands on instances",["ssm:SendCommand"],"Can run shell commands on managed EC2 instances and use their roles."],["Edit a role's trust policy",["iam:UpdateAssumeRolePolicy","sts:AssumeRole"],"Can let itself assume any role and then assume it."]],"labels":{"data_access":"Reads sensitive data","exfiltration":"Can send data or access outside the account","privilege_escalation":"Can escalate privileges","destructive":"Can delete or break resources","defense_evasion":"Can turn off logging or detection"}}/*CATALOG_END*/;
+
+const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+const POINTS = { CRITICAL: 40, HIGH: 15, MEDIUM: 5, LOW: 1 };
+const CATEGORY_SEVERITY = [
+  ["privilege_escalation", "HIGH"], ["defense_evasion", "HIGH"], ["destructive", "MEDIUM"],
+  ["exfiltration", "MEDIUM"], ["data_access", "MEDIUM"],
+];
+
+const toList = v => v == null ? [] : (typeof v === "string" ? [v] : Array.from(v));
+const rxCache = new Map();
+function actionMatches(pattern, action) {
+  let rx = rxCache.get(pattern);
+  if (!rx) {
+    const esc = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*").replace(/\\\?/g, ".");
+    rx = new RegExp("^" + esc + "$", "i");
+    rxCache.set(pattern, rx);
+  }
+  return rx.test(action);
+}
+const BROAD_ARN = /^arn:aws[a-z-]*:[a-z0-9-]+:[^:]*:[^:]*:\*$/i;
+const isWildcardResource = r => r === "*" || BROAD_ARN.test(r);
+
+function covers(st, action) {
+  if (st.actions.length) return st.actions.some(p => actionMatches(p, action));
+  if (st.notActions.length) return !st.notActions.some(p => actionMatches(p, action));
+  return false;
+}
+
+function parsePolicy(doc, source) {
+  let raw = doc.Statement || [];
+  if (!Array.isArray(raw)) raw = [raw];
+  return raw.map((st, i) => {
+    const effect = st.Effect || "";
+    if (effect !== "Allow" && effect !== "Deny") throw new Error(`${source || "policy"}: statement ${i} has invalid Effect "${effect}"`);
+    let resources = toList(st.Resource);
+    if (st.NotResource != null) resources = ["*"];
+    return {
+      effect, actions: toList(st.Action), notActions: toList(st.NotAction),
+      resources: resources.length ? resources : ["*"],
+      hasCondition: !!(st.Condition && Object.keys(st.Condition).length),
+      sid: st.Sid || `Statement${i}`,
+    };
+  });
+}
+
+function evaluate(statements, action) {
+  const allows = statements.filter(s => s.effect === "Allow" && covers(s, action));
+  const denies = statements.filter(s => s.effect === "Deny" && covers(s, action));
+  if (denies.some(d => !d.hasCondition)) return { allowed: false };
+  if (!allows.length) return { allowed: false };
+  const resources = [...new Set(allows.flatMap(a => a.resources))].sort();
+  return {
+    allowed: true,
+    conditional: !allows.some(a => !a.hasCondition) || denies.length > 0,
+    wildcardResource: resources.some(isWildcardResource),
+    resources,
+  };
+}
+
+const TOOL_KEYS = new Set(["name", "description", "aws_actions", "resources", "reads_untrusted_input", "external_comms", "touches_private_data"]);
+function parseManifest(doc) {
+  if (!doc || !Array.isArray(doc.tools)) throw new Error("The agent tools need a \"tools\" list.");
+  const tools = doc.tools.map((raw, i) => {
+    if (!("name" in raw)) throw new Error(`Tool ${i} is missing a "name".`);
+    const unknown = Object.keys(raw).filter(k => !TOOL_KEYS.has(k)).sort();
+    if (unknown.length) throw new Error(`Tool "${raw.name}" has unknown keys: ${unknown.join(", ")}`);
+    for (const a of raw.aws_actions || []) {
+      if (!a.includes(":") || a.includes("*")) throw new Error(`Tool "${raw.name}": aws_actions must be exact actions like "s3:GetObject", got "${a}"`);
+    }
+    return {
+      name: raw.name, aws_actions: [...(raw.aws_actions || [])], resources: [...(raw.resources || [])],
+      reads_untrusted_input: !!raw.reads_untrusted_input, external_comms: !!raw.external_comms,
+      touches_private_data: !!raw.touches_private_data,
+    };
+  });
+  return { agent: doc.agent || "unnamed-agent", tools };
+}
+
+function neededActions(manifest) {
+  const seen = [];
+  for (const t of manifest.tools) for (const a of t.aws_actions)
+    if (!seen.some(s => s.toLowerCase() === a.toLowerCase())) seen.push(a);
+  return seen;
+}
+
+const bump = s => SEVERITIES[Math.max(0, SEVERITIES.indexOf(s) - 1)];
+const pad2 = n => String(n).padStart(2, "0");
+const pySorted = arr => [...arr].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+
+function analyze(manifest, statements) {
+  const R = CATALOG.risky_actions;
+  const findings = [];
+  const needed = neededActions(manifest);
+  const neededLower = new Set(needed.map(a => a.toLowerCase()));
+  const untrusted = manifest.tools.filter(t => t.reads_untrusted_input).map(t => t.name);
+  const hijackable = untrusted.length > 0;
+
+  const reachable = {};
+  for (const action of Object.keys(R)) {
+    const d = evaluate(statements, action);
+    if (d.allowed) reachable[action] = d;
+  }
+  const excess = Object.keys(reachable).filter(a => !neededLower.has(a.toLowerCase()));
+
+  const privateTools = manifest.tools.filter(t => t.touches_private_data).map(t => t.name);
+  const privateActions = pySorted(Object.keys(reachable).filter(a => R[a].includes("data_access")));
+  const exfilTools = manifest.tools.filter(t => t.external_comms).map(t => t.name);
+  const exfilActions = pySorted(Object.keys(reachable).filter(a => R[a].includes("exfiltration")));
+  const trifecta = {
+    untrusted, private: privateTools.concat(privateActions), out: exfilTools.concat(exfilActions),
+  };
+  if (untrusted.length && (privateTools.length || privateActions.length) && (exfilTools.length || exfilActions.length)) {
+    const more = arr => arr.length > 6 ? ["..."] : [];
+    const legs = [
+      `Untrusted input: ${untrusted.join(", ")}`,
+      "Private data: " + privateTools.concat(privateActions.slice(0, 6), more(privateActions)).join(", "),
+      "Way out: " + exfilTools.concat(exfilActions.slice(0, 6), more(exfilActions)).join(", "),
+    ];
+    findings.push({
+      id: "ABR-001", severity: "CRITICAL",
+      title: "Lethal trifecta: a prompt injection can steal private data",
+      detail: "The agent reads attacker-controlled content, can reach private data, and has a way to send data out. A hidden instruction in a web page or email could make it read secrets and send them to the attacker.\n" + legs.map(l => "  - " + l).join("\n"),
+      fix: "Break one leg: run the untrusted-input tool in a separate agent with no data access, remove the outbound tool, or require human approval before anything is sent out.",
+      actions: privateActions.concat(exfilActions), tools: untrusted.concat(privateTools, exfilTools),
+    });
+  }
+
+  const reachableLower = new Set(Object.keys(reachable).map(a => a.toLowerCase()));
+  CATALOG.escalation_paths.forEach(([name, required, why], idx) => {
+    if (!required.every(r => reachableLower.has(r.toLowerCase()))) return;
+    if (required.every(r => neededLower.has(r.toLowerCase()))) return;
+    findings.push({
+      id: `ABR-1${pad2(idx + 1)}`, severity: hijackable ? "CRITICAL" : "HIGH",
+      title: `Privilege escalation path: ${name}`,
+      detail: why + (hijackable ? " The agent reads untrusted input, so an attacker can steer it here." : ""),
+      fix: `Remove ${required.join(", ")} from the agent's role.`,
+      actions: [...required], tools: [],
+    });
+  });
+
+  const byCat = {};
+  for (const a of excess) for (const c of R[a]) (byCat[c] = byCat[c] || []).push(a);
+  CATEGORY_SEVERITY.forEach(([cat, base], idx) => {
+    const actions = pySorted(byCat[cat] || []);
+    if (!actions.length) return;
+    findings.push({
+      id: `ABR-2${pad2(idx + 1)}`, severity: hijackable ? bump(base) : base,
+      title: `Unused permissions: ${CATALOG.labels[cat].toLowerCase()}`,
+      detail: `${actions.length} risky action(s) in this category are allowed but no tool uses them. They only add to what a hijacked agent could do.`,
+      fix: "Remove these actions from the role, or replace the policy with the generated least-privilege policy.",
+      actions, tools: [],
+    });
+  });
+
+  for (const st of statements) {
+    if (st.effect !== "Allow") continue;
+    const broad = st.actions.filter(a => a === "*" || a.endsWith(":*"));
+    if (st.notActions.length) broad.push("NotAction (allows everything not listed)");
+    if (broad.length) findings.push({
+      id: "ABR-301", severity: broad.includes("*") || st.notActions.length ? "HIGH" : "MEDIUM",
+      title: `Wildcard permission in statement '${st.sid}'`,
+      detail: `Allows ${broad.join(", ")}. New AWS actions get added to wildcards automatically.`,
+      fix: "List the exact actions the tools call instead of a wildcard.", actions: broad, tools: [],
+    });
+  }
+
+  for (const t of manifest.tools) {
+    if (!t.aws_actions.length || !t.resources.length) continue;
+    const wide = t.aws_actions.filter(a => evaluate(statements, a).wildcardResource);
+    if (wide.length) findings.push({
+      id: "ABR-302", severity: "MEDIUM",
+      title: `Tool '${t.name}' only needs specific resources but the role allows all of them`,
+      detail: `${wide.join(", ")} ${wide.length === 1 ? "is" : "are"} allowed on every resource, but the tool only uses ${t.resources.join(", ")}.`,
+      fix: "Scope the Resource element to the ARNs listed for this tool.", actions: wide, tools: [t.name],
+    });
+  }
+
+  for (const st of statements) {
+    if (st.effect !== "Allow" || !st.actions.length) continue;
+    if (needed.some(a => covers(st, a))) continue;
+    findings.push({
+      id: "ABR-303", severity: "LOW", title: `Statement '${st.sid}' is not used by any tool`,
+      detail: `It allows ${st.actions.join(", ")}, but no tool in the manifest calls these.`,
+      fix: "Delete the statement.", actions: [...st.actions], tools: [],
+    });
+  }
+
+  for (const t of manifest.tools) {
+    const missing = t.aws_actions.filter(a => !evaluate(statements, a).allowed);
+    if (missing.length) findings.push({
+      id: "ABR-401", severity: "LOW", title: `Tool '${t.name}' is missing permissions`,
+      detail: `The role does not allow ${missing.join(", ")}, so this tool will fail.`,
+      fix: "Add these actions (scoped to the tool's resources) or remove the tool.", actions: missing, tools: [t.name],
+    });
+  }
+
+  findings.sort((a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const score = Math.min(100, findings.reduce((s, f) => s + POINTS[f.severity], 0));
+  return {
+    agent: manifest.agent, findings, reachable, needed, score, trifecta,
+    unused: pySorted(excess),
+    leastPrivilege: leastPrivilegePolicy(manifest),
+  };
+}
+
+function pyTitle(s) {
+  let out = "", prevCased = false;
+  for (const ch of s) {
+    const cased = ch.toLowerCase() !== ch.toUpperCase();
+    out += cased ? (prevCased ? ch.toLowerCase() : ch.toUpperCase()) : ch;
+    prevCased = cased;
+  }
+  return out;
+}
+const toSid = name => pyTitle(name.replace(/[^A-Za-z0-9]/g, " ")).replace(/ /g, "") || "Tool";
+
+function leastPrivilegePolicy(manifest) {
+  const statements = [];
+  for (const t of manifest.tools) {
+    if (!t.aws_actions.length) continue;
+    statements.push({
+      Sid: toSid(t.name), Effect: "Allow",
+      Action: pySorted([...new Set(t.aws_actions)]),
+      Resource: t.resources.length ? t.resources : "*",
+    });
+  }
+  return { Version: "2012-10-17", Statement: statements };
+}
+
+const rating = s => s >= 70 ? "Severe" : s >= 40 ? "High" : s >= 15 ? "Moderate" : "Low";
+
+/* Same shape as `abr scan -f json`, used by the parity test. */
+function toReport(result) {
+  const counts = {};
+  for (const s of SEVERITIES) counts[s.toLowerCase()] = result.findings.filter(f => f.severity === s).length;
+  return {
+    agent: result.agent, score: result.score, rating: rating(result.score), counts,
+    reachable_risky_actions: pySorted(Object.keys(result.reachable)),
+    unused_risky_actions: result.unused,
+    findings: result.findings, least_privilege_policy: result.leastPrivilege,
+  };
+}
+window.ABR = { parsePolicy, parseManifest, analyze, toReport };
+
+/* ===== Page ===== */
+const EXAMPLE_MANIFEST = {
+  agent: "acme-support-bot",
+  tools: [
+    { name: "browse_web", description: "Opens a URL the customer sends and summarizes the page", reads_untrusted_input: true, external_comms: true },
+    { name: "read_support_inbox", description: "Reads new customer emails from the support inbox", reads_untrusted_input: true, touches_private_data: true },
+    { name: "lookup_order", description: "Looks up a customer's order by order ID", aws_actions: ["dynamodb:GetItem", "dynamodb:Query"], resources: ["arn:aws:dynamodb:us-east-1:111122223333:table/orders"], touches_private_data: true },
+    { name: "get_help_article", description: "Fetches a help center article", aws_actions: ["s3:GetObject"], resources: ["arn:aws:s3:::acme-help-center/*"] },
+    { name: "request_refund", description: "Queues a refund request for a human to approve", aws_actions: ["sqs:SendMessage"], resources: ["arn:aws:sqs:us-east-1:111122223333:refund-requests"] },
+  ],
+};
+const EXAMPLE_POLICY = {
+  Version: "2012-10-17",
+  Statement: [
+    { Sid: "AppData", Effect: "Allow", Action: "dynamodb:*", Resource: "*" },
+    { Sid: "HelpCenter", Effect: "Allow", Action: ["s3:Get*", "s3:List*"], Resource: "*" },
+    { Sid: "RefundQueue", Effect: "Allow", Action: "sqs:SendMessage", Resource: "arn:aws:sqs:us-east-1:111122223333:refund-requests" },
+    { Sid: "AppConfig", Effect: "Allow", Action: "secretsmanager:GetSecretValue", Resource: "*" },
+    { Sid: "DebugAddedDuringLaunch", Effect: "Allow", Action: ["lambda:*", "iam:PassRole"], Resource: "*" },
+    { Sid: "EmailCustomers", Effect: "Allow", Action: "ses:SendEmail", Resource: "*" },
+  ],
+};
+
+const $ = id => document.getElementById(id);
+const json = o => JSON.stringify(o, null, 2);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let lastResult = null;
+
+function readJSON(id, what) {
+  try { return JSON.parse($(id).value); }
+  catch (e) { throw new Error(`The ${what} box isn't valid JSON. ${e.message}`); }
+}
+
+function scan() {
+  $("error").textContent = "";
+  let manifest, statements;
+  try {
+    manifest = parseManifest(readJSON("manifest", "agent tools"));
+    const pol = readJSON("policy", "IAM policy");
+    const docs = Array.isArray(pol) ? pol : [pol];
+    statements = docs.flatMap((d, i) => parsePolicy(d, docs.length > 1 ? `Policy ${i + 1}` : "Policy"));
+  } catch (e) {
+    $("error").textContent = e.message;
+    return;
+  }
+  lastResult = analyze(manifest, statements);
+  render(lastResult);
+}
+
+const SECTORS = [
+  ["privilege_escalation", "Privilege escalation"],
+  ["exfiltration", "Exfiltration"],
+  ["data_access", "Data access"],
+  ["destructive", "Deletion"],
+  ["defense_evasion", "Logging off"],
+];
+
+function drawMap(result) {
+  const svg = $("map"), NS = "http://www.w3.org/2000/svg", C = 220;
+  const desc = svg.querySelector("desc");
+  svg.replaceChildren(desc);
+  const el = (tag, attrs, parent = svg) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    parent.appendChild(n);
+    return n;
+  };
+  const R_IN = 92, R_OUT = 150, R_OUT2 = 172;
+  el("circle", { cx: C, cy: C, r: R_IN, class: "ring" });
+  el("circle", { cx: C, cy: C, r: (R_OUT + R_OUT2) / 2, class: "ring outer" });
+  const step = 360 / SECTORS.length;
+  const pt = (deg, r) => [C + r * Math.cos((deg - 90) * Math.PI / 180), C + r * Math.sin((deg - 90) * Math.PI / 180)];
+
+  const neededLower = new Set(result.needed.map(a => a.toLowerCase()));
+  const groups = Object.fromEntries(SECTORS.map(([k]) => [k, { used: [], unused: [] }]));
+  for (const a of Object.keys(result.reachable)) {
+    const cat = CATALOG.risky_actions[a][0];
+    groups[cat][neededLower.has(a.toLowerCase()) ? "used" : "unused"].push(a);
+  }
+
+  const dots = [];
+  SECTORS.forEach(([key, label], i) => {
+    const start = i * step;
+    const [x1, y1] = pt(start, 50), [x2, y2] = pt(start, 196);
+    el("line", { x1, y1, x2, y2, class: "spoke" });
+    const [lx, ly] = pt(start + step / 2, 208);
+    const t = el("text", { x: lx, y: ly + 4, class: "cat", "text-anchor": lx < C - 20 ? "end" : lx > C + 20 ? "start" : "middle" });
+    t.textContent = label;
+    for (const ring of ["used", "unused"]) {
+      const list = groups[key][ring];
+      list.forEach((a, j) => {
+        const deg = start + step * (j + 1) / (list.length + 1);
+        const r = ring === "used" ? R_IN : (j % 2 ? R_OUT2 : R_OUT);
+        dots.push({ a, deg, r, ring });
+      });
+    }
+  });
+  el("circle", { cx: C, cy: C, r: 44, class: "core" });
+  const name = el("text", { x: C, y: C + 5, class: "corelabel", "text-anchor": "middle" });
+  name.textContent = "Agent";
+
+  dots.forEach((d, i) => {
+    const [x, y] = pt(d.deg, d.r);
+    const c = el("circle", { cx: x, cy: y, r: 8, class: "dot " + d.ring, tabindex: 0, role: "img",
+      "aria-label": `${d.a}, ${d.ring === "used" ? "used by a tool" : "allowed but never used"}` });
+    el("title", {}, c).textContent = d.a;
+    const show = () => { $("tip").textContent = `${d.a}: ${d.ring === "used" ? "used by a tool" : "allowed, never used"}`; };
+    c.addEventListener("mouseenter", show); c.addEventListener("focus", show);
+    if (!reduceMotion && d.ring === "unused") {
+      c.animate([{ cx: C, cy: C, opacity: 0 }, { cx: x, cy: y, opacity: 1 }],
+        { duration: 650, delay: 120 + i * 14, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" });
+    }
+  });
+
+  const used = dots.filter(d => d.ring === "used").length, unused = dots.length - used;
+  $("mapsub").textContent = dots.length
+    ? `${result.agent} can reach ${dots.length} risky actions. ` +
+      (unused ? `${unused} of them no tool ever uses.` : "Every one of them is used by a tool.")
+    : `${result.agent} can't reach any risky actions.`;
+  $("tip").textContent = "";
+}
+
+function drawLegs(result) {
+  const t = result.trifecta;
+  const legs = [
+    ["Untrusted input", t.untrusted],
+    ["Private data", t.private],
+    ["A way out", t.out],
+  ];
+  $("legs").innerHTML = legs.map(([label, items]) =>
+    `<div class="leg ${items.length ? "on" : ""}"><b>${label}</b><span class="state">${items.length ? `Yes, ${items.length} source${items.length > 1 ? "s" : ""}` : "None found"}</span></div>`
+  ).join("");
+}
+
+function render(result) {
+  drawMap(result);
+  drawLegs(result);
+  $("score").textContent = result.score;
+  $("rating").textContent = rating(result.score);
+  $("meter").style.width = result.score + "%";
+  const c = SEVERITIES.map(s => `${result.findings.filter(f => f.severity === s).length} ${s.toLowerCase()}`);
+  $("counts").textContent = `${result.findings.length} finding${result.findings.length === 1 ? "" : "s"}: ${c.join(", ")}`;
+  $("findings").innerHTML = result.findings.length ? result.findings.map((f, i) => `
+    <li><details ${i === 0 ? "open" : ""}>
+      <summary><span class="sev ${f.severity}">${f.severity[0] + f.severity.slice(1).toLowerCase()}</span>
+        <span class="ftitle">${esc(f.title)}<small>${f.id}</small></span></summary>
+      <div class="fbody">
+        <p>${esc(f.detail)}</p>
+        ${f.id.startsWith("ABR-2") ? `<p>${f.actions.map(a => `<code>${esc(a)}</code>`).join(" ")}</p>` : ""}
+        <p><b>Fix:</b> ${esc(f.fix)}</p>
+      </div>
+    </details></li>`).join("")
+    : `<li class="clean">No findings. The role matches what the tools need.</li>`;
+  $("lp").textContent = json(result.leastPrivilege);
+}
+
+$("scan").addEventListener("click", scan);
+$("loadBad").addEventListener("click", () => { $("manifest").value = json(EXAMPLE_MANIFEST); $("policy").value = json(EXAMPLE_POLICY); scan(); });
+$("loadFixed").addEventListener("click", () => {
+  try { $("policy").value = json(leastPrivilegePolicy(parseManifest(readJSON("manifest", "agent tools")))); scan(); }
+  catch (e) { $("error").textContent = e.message; }
+});
+$("apply").addEventListener("click", () => {
+  if (!lastResult) return;
+  $("policy").value = json(lastResult.leastPrivilege);
+  scan();
+  $("map").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+});
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("lp").textContent); $("copy").textContent = "Copied"; }
+  catch { $("copy").textContent = "Select and copy"; }
+  setTimeout(() => { $("copy").textContent = "Copy policy"; }, 1800);
+});
+
+$("manifest").value = json(EXAMPLE_MANIFEST);
+$("policy").value = json(EXAMPLE_POLICY);
+scan();
+</script>
+</body>
+</html>

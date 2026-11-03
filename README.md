@@ -15,6 +15,8 @@ It gives back a blast radius score, findings ranked by severity, and a least-pri
 
 No AWS account or credentials needed. It runs offline and has zero dependencies.
 
+**Try it in your browser:** [casimirterr.github.io/ABR](https://casimirterr.github.io/ABR/). Paste an agent's tools and its IAM policy and get the report and blast map right away. Everything runs on the page, so nothing you paste is sent anywhere.
+
 ## Quick start
 
 ```bash
@@ -119,6 +121,14 @@ The scan exits with code 1 if any finding is high or critical, so a pull request
 
 - The "lethal trifecta" idea comes from Simon Willison's writing on prompt injection.
 - The privilege escalation paths are based on Rhino Security Labs' research on AWS IAM privilege escalation.
+
+## Web playground
+
+The page in [`docs/index.html`](docs/index.html) runs the same checks in JavaScript, with no server. It draws a blast map: risky actions the agent can reach, grouped by type, with the ones no tool uses in the outer ring. A test makes sure its rule catalog matches `abr/catalog.py`. After editing the catalog, run:
+
+```bash
+python scripts/sync_web_catalog.py
+```
 
 ## Run the tests
 
