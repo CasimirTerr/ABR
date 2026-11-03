@@ -1,0 +1,41 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AppData",
+      "Effect": "Allow",
+      "Action": "dynamodb:*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "HelpCenter",
+      "Effect": "Allow",
+      "Action": ["s3:Get*", "s3:List*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RefundQueue",
+      "Effect": "Allow",
+      "Action": "sqs:SendMessage",
+      "Resource": "arn:aws:sqs:us-east-1:111122223333:refund-requests"
+    },
+    {
+      "Sid": "AppConfig",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DebugAddedDuringLaunch",
+      "Effect": "Allow",
+      "Action": ["lambda:*", "iam:PassRole"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EmailCustomers",
+      "Effect": "Allow",
+      "Action": "ses:SendEmail",
+      "Resource": "*"
+    }
+  ]
+}

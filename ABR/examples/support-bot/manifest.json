@@ -1,0 +1,36 @@
+{
+  "agent": "acme-support-bot",
+  "tools": [
+    {
+      "name": "browse_web",
+      "description": "Opens a URL the customer sends and summarizes the page",
+      "reads_untrusted_input": true,
+      "external_comms": true
+    },
+    {
+      "name": "read_support_inbox",
+      "description": "Reads new customer emails from the support inbox",
+      "reads_untrusted_input": true,
+      "touches_private_data": true
+    },
+    {
+      "name": "lookup_order",
+      "description": "Looks up a customer's order by order ID",
+      "aws_actions": ["dynamodb:GetItem", "dynamodb:Query"],
+      "resources": ["arn:aws:dynamodb:us-east-1:111122223333:table/orders"],
+      "touches_private_data": true
+    },
+    {
+      "name": "get_help_article",
+      "description": "Fetches a help center article",
+      "aws_actions": ["s3:GetObject"],
+      "resources": ["arn:aws:s3:::acme-help-center/*"]
+    },
+    {
+      "name": "request_refund",
+      "description": "Queues a refund request for a human to approve",
+      "aws_actions": ["sqs:SendMessage"],
+      "resources": ["arn:aws:sqs:us-east-1:111122223333:refund-requests"]
+    }
+  ]
+}

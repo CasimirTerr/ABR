@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abr"
+version = "0.1.0"
+description = "ABR (Agent Blast Radius): see what a hijacked AI agent could do in your AWS account"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Casimir Terrence" }]
+keywords = ["ai-security", "aws", "iam", "prompt-injection", "llm-agents", "cloud-security"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+abr = "abr.cli:main"
+
+[tool.setuptools]
+packages = ["abr"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
